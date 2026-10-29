@@ -1,0 +1,4 @@
+PyJWT[crypto]==2.15.1
+cryptography==50.0.2
+ruamel.yaml==0.19.1
+yamllint==1.38.0

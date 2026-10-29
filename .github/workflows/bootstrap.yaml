@@ -1,0 +1,76 @@
+name: Bootstrap state bucket
+# Run by hand from Actions. Needed once to create the bucket, then only after changing bootstrap/.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  # Repo variables (Settings > Secrets and variables > Actions > Variables). Jobs that need AWS skip until TF_STATE_BUCKET is set.
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+concurrency:
+  group: okta-group-rules-bootstrap
+  cancel-in-progress: false
+jobs:
+  bucket:
+    name: Create or update the state bucket
+    if: ${{ github.ref == 'refs/heads/main' && vars.TF_STATE_BUCKET != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      TF_VAR_state_bucket: ${{ vars.TF_STATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # reference v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # reference v4.0.1
+        with:
+          terraform_version: 1.17.0
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # reference v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: okta-group-rules-bootstrap
+      - name: Verify AWS account identity
+        run: test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
+      - name: Create the bucket if missing, otherwise apply any config change
+        working-directory: bootstrap
+        run: |
+          set -euo pipefail
+          # The owner check turns a same-named bucket in another account into a 403 instead of a match.
+          if out="$(aws s3api head-bucket --bucket "$BUCKET" --expected-bucket-owner "$AWS_ACCOUNT_ID" 2>&1)"; then
+            terraform init -input=false -no-color -lockfile=readonly -backend-config="bucket=$BUCKET"
+            # Recovers from a first run that created the bucket but failed before its state was moved in.
+            terraform state show aws_s3_bucket.state > /dev/null 2>&1 || terraform import -input=false -no-color aws_s3_bucket.state "$BUCKET"
+            code=0
+            terraform plan -input=false -no-color -lock-timeout=10m -detailed-exitcode -out=tfplan || code=$?
+            if [ "$code" = 2 ]; then
+              terraform apply -input=false -no-color tfplan
+            elif [ "$code" != 0 ]; then
+              exit "$code"
+            fi
+            echo "### State bucket $BUCKET is ready" >> "$GITHUB_STEP_SUMMARY"
+          elif grep -q '(404)' <<< "$out"; then
+            # First run: this config's own state can't go in a bucket that doesn't exist yet,
+            # so create it with local state and then move that state into the new bucket.
+            mv backend.tf backend.tf.first-run
+            terraform init -input=false -no-color -lockfile=readonly
+            terraform apply -input=false -no-color -auto-approve
+            mv backend.tf.first-run backend.tf
+            terraform init -input=false -no-color -lockfile=readonly -migrate-state -force-copy -backend-config="bucket=$BUCKET"
+            rm -f terraform.tfstate terraform.tfstate.backup
+            echo "### Created state bucket $BUCKET" >> "$GITHUB_STEP_SUMMARY"
+          else
+            # Only a real 404 means "create it". Anything else (403 owned by someone else, throttling) stops here.
+            echo "$out"
+            exit 1
+          fi

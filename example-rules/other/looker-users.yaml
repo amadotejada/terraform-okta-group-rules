@@ -1,0 +1,8 @@
+# Anyone in one of the Looker team groups also gets the base Looker group.
+# Okta expressions take group ids here, not names.
+looker-users:
+  name: Looker Users
+  expression: isMemberOfAnyGroup("00g1a2b3c4d5e6f7g8h9","00g9z8y7x6w5v4u3t2s1")
+  groups:
+    - looker-users
+  status: ACTIVE

@@ -1,0 +1,8 @@
+rule-a:
+  name: Same Name
+  expression: user.department == "A"
+  groups: [github-users]
+rule-b:
+  name: Same Name
+  expression: user.department == "B"
+  groups: [github-users]

@@ -1,0 +1,171 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rules/**"
+      - "*.tf"
+      - ".terraform.lock.hcl"
+      - "scripts/**"
+      - ".github/workflows/deploy.yaml"
+      - ".github/workflows/validate.yaml"
+      - ".github/actions/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  # Repo variables (Settings > Secrets and variables > Actions > Variables). Jobs that need AWS skip until TF_STATE_BUCKET is set.
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+concurrency:
+  group: okta-group-rules-prod
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yaml
+    # GitHub checks the nested PR plan job's permissions at startup even though it is skipped on push.
+    permissions:
+      contents: read
+      id-token: write
+  plan:
+    needs: validate
+    if: ${{ github.ref == 'refs/heads/main' && vars.TF_STATE_BUCKET != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      commit: ${{ steps.commit.outputs.sha }}
+      environment: ${{ steps.plan.outputs.environment }}
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # reference v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/okta-terraform
+        with:
+          okta-oauth: ${{ secrets.OKTA_OAUTH }}
+          session-name: okta-group-rules-plan
+      - id: plan
+        name: Plan, summarize and pick the gate
+        run: |
+          set -euo pipefail
+          terraform plan -input=false -no-color -lock-timeout=10m -out=tfplan
+          terraform show -json tfplan > plan.json
+          COMMIT_TITLE="$(git log -1 --format=%s)" python3 scripts/okta_rules.py summary plan.json
+          sha256sum tfplan > review.sha256
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # reference v7.0.2
+        with:
+          name: okta-plan-${{ github.run_id }}
+          # prod-gated approvals can sit over a weekend
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            tfplan
+            review.sha256
+            slack.txt
+      - if: failure()
+        uses: ./.github/actions/slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          text: "Okta group rules plan FAILED on main: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+  approve:
+    needs: plan
+    if: ${{ needs.plan.outputs.has_changes == 'true' }}
+    runs-on: ubuntu-24.04
+    # prod-gated (reviewers) when more than 5 rules change or anything is deleted, otherwise prod-auto.
+    environment: ${{ needs.plan.outputs.environment }}
+    permissions: {}
+    steps:
+      - name: Gate passed
+        env:
+          GATE: ${{ needs.plan.outputs.environment }}
+        run: echo "$GATE approved this run's saved plan."
+  apply:
+    needs: [plan, approve]
+    if: ${{ needs.approve.result == 'success' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      applied: ${{ steps.apply.outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # reference v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # reference v8.0.2
+        with:
+          name: okta-plan-${{ github.run_id }}
+      - name: Check the saved plan is the reviewed one
+        run: sha256sum --check review.sha256
+      - uses: ./.github/actions/okta-terraform
+        with:
+          okta-oauth: ${{ secrets.OKTA_OAUTH }}
+          okta-scopes: okta.groups.manage
+          session-name: okta-group-rules-apply
+      - id: apply
+        name: Apply only the saved plan
+        run: terraform apply -input=false -no-color -lock-timeout=10m tfplan
+      - name: Pull state for the backup branch
+        if: ${{ always() && steps.apply.outcome != 'skipped' }}
+        run: terraform state pull > "$RUNNER_TEMP/terraform.tfstate"
+      - if: ${{ always() && steps.apply.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # reference v7.0.2
+        with:
+          name: okta-state-${{ github.run_id }}
+          retention-days: 1
+          if-no-files-found: error
+          path: ${{ runner.temp }}/terraform.tfstate
+      - uses: ./.github/actions/slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          file: slack.txt
+          actor: ${{ github.actor }}
+          text: "Applied by {actor}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - if: failure()
+        uses: ./.github/actions/slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          text: "Okta group rules apply FAILED, check the run before retrying: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+  backup:
+    needs: apply
+    if: ${{ always() && (needs.apply.outputs.applied == 'success' || needs.apply.outputs.applied == 'failure') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # reference v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # reference v8.0.2
+        with:
+          name: okta-state-${{ github.run_id }}
+          path: ${{ runner.temp }}/state
+      - name: Commit state to the tfstate-backup branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$url" tfstate-backup > /dev/null; then
+            git fetch -q --depth 1 "$url" tfstate-backup && git switch -q -c tfstate-backup FETCH_HEAD
+          else
+            git switch -q --orphan tfstate-backup
+          fi
+          cp "$RUNNER_TEMP/state/terraform.tfstate" terraform.tfstate
+          git add -f terraform.tfstate
+          if git diff --cached --quiet; then echo "State unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "State after ${GITHUB_SHA::7} (run $GITHUB_RUN_ID)"
+          git push -q "$url" tfstate-backup
+# OIDC subject stays ref:refs/heads/main because only the approve job (no AWS) uses an environment.

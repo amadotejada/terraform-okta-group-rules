@@ -1,0 +1,15 @@
+# The import files a rule here when its expression checks user.organization but no department or team.
+emp-all-employees:
+  name: Emp All Employees
+  expression: (user.organization=="Acme") and (user.userType=="Employee")
+  groups:
+    - all-employees
+    - slack-users
+  status: ACTIVE
+all-contractors:
+  name: All Contractors
+  expression: (user.organization=="Acme") and (user.userType=="Contractor")
+  groups:
+    - contractors
+    - slack-users
+  status: ACTIVE

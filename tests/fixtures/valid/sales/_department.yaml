@@ -1,0 +1,5 @@
+sales-ae-tr:
+  name: Emp Sales - AE TR
+  expression: user.department == "Sales"
+  groups:
+    - salesforce-users
