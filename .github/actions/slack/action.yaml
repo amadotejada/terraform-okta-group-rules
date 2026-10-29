@@ -1,0 +1,35 @@
+name: Slack message
+description: Post a message to the SLACK_WEBHOOK channel. Never fails the job, and does nothing without a webhook.
+inputs:
+  webhook:
+    required: true
+  text:
+    required: true
+  file:
+    description: Optional file whose content is appended to the text
+    default: ''
+  actor:
+    description: GitHub username that replaces {actor} in the text, as a Slack @mention when it's in .github/slack-users.yaml
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        SLACK_WEBHOOK: ${{ inputs.webhook }}
+        TEXT: ${{ inputs.text }}
+        TEXT_FILE: ${{ inputs.file }}
+        ACTOR: ${{ inputs.actor }}
+      run: |
+        [ -n "$SLACK_WEBHOOK" ] || exit 0
+        if [ -n "$ACTOR" ]; then
+          id="$(awk -F': *' -v u="$ACTOR" 'tolower($1) == tolower(u) {print $2; exit}' .github/slack-users.yaml 2>/dev/null | tr -d "\"'\r" || true)"
+          id="${id%% *}"
+          # Only well-formed member IDs become a mention; anything else falls back to the username.
+          if [[ "$id" =~ ^[UW][A-Z0-9]{6,}$ ]]; then who="<@$id>"; else who="$ACTOR"; fi
+          TEXT="${TEXT//\{actor\}/$who}"
+        fi
+        if [ -n "$TEXT_FILE" ] && [ -f "$TEXT_FILE" ]; then TEXT="$(cat "$TEXT_FILE")"$'\n'"$TEXT"; fi
+        jq -n --arg text "$TEXT" '{text: $text}' \
+          | curl -fsS --max-time 15 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" \
+          || echo "::warning::Slack post failed"

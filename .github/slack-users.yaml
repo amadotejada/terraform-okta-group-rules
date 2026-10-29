@@ -1,0 +1,4 @@
+# GitHub username: Slack member ID, used to @mention people in Slack alerts.
+# Find a member ID in Slack: open the person's profile, click the three dots, then "Copy member ID".
+# People not listed here show as their GitHub username. Example:
+# octocat: U0123ABCD

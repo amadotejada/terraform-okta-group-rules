@@ -1,0 +1,8 @@
+# The team shows up under more than one department, so the rule matches all of them.
+emp-cs-implementation-tr:
+  name: Emp CS - Implementation TR
+  expression: (user.userType=="Employee") and (user.department=="Customer Success" or user.department=="Sales") and (user.team=="CS - Implementation")
+  groups:
+    - salesforce-users
+    - zendesk-agents
+  status: ACTIVE

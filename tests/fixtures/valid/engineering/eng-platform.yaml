@@ -1,0 +1,7 @@
+eng-platform-tr:
+  name: Emp Eng - Platform TR
+  expression: user.department == "Engineering" && user.team == "Platform"
+  groups:
+    - github-users
+    - aws-readonly
+  status: ACTIVE

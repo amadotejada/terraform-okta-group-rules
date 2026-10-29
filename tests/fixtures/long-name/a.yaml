@@ -1,0 +1,4 @@
+rule-a:
+  name: This rule name is far too long for Okta to accept it at all
+  expression: user.department == "A"
+  groups: [github-users]

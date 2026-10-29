@@ -1,0 +1,4 @@
+Rule A:
+  name: Rule A
+  expression: user.department == "A"
+  groups: [github-users]

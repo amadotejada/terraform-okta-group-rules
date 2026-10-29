@@ -1,0 +1,8 @@
+# Everyone in the department, whatever their team.
+emp-engineering-dr:
+  name: Emp Engineering DR
+  expression: (user.userType=="Employee") and (user.department=="Engineering")
+  groups:
+    - engineering
+    - github-users
+  status: ACTIVE

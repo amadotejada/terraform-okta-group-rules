@@ -1,0 +1,4 @@
+same-key:
+  name: Rule B
+  expression: user.department == "B"
+  groups: [github-users]

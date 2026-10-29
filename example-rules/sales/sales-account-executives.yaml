@@ -1,0 +1,8 @@
+# Created switched off. Change to ACTIVE in a later PR to turn it on.
+emp-sales-account-executives-tr:
+  name: Emp Sales - Account Executives TR
+  expression: (user.userType=="Employee") and (user.department=="Sales") and (user.team=="Sales - Account Executives")
+  groups:
+    - salesforce-users
+    - gong-users
+  status: INACTIVE

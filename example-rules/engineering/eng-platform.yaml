@@ -1,0 +1,10 @@
+emp-eng-platform-tr:
+  name: Emp Eng - Platform TR
+  expression: (user.userType=="Employee") and (user.department=="Engineering") and (user.team=="Eng - Platform")
+  groups:
+    - aws-developers
+    - pagerduty-users
+  status: ACTIVE
+  # Okta user ids that never get this rule's groups, e.g. a shared test account.
+  users_excluded:
+    - 00u1a2b3c4d5e6f7g8h9

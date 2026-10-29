@@ -1,0 +1,67 @@
+name: Validate
+on:
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+env:
+  # Repo variables (Settings > Secrets and variables > Actions > Variables). Jobs that need AWS skip until TF_STATE_BUCKET is set.
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+jobs:
+  checks:
+    name: Format, lint and offline tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # reference v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # reference v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # reference v4.0.1
+        with:
+          terraform_version: 1.17.0
+          terraform_wrapper: false
+      - name: Checks
+        run: |
+          set -euo pipefail
+          python3 -m pip install -q -r scripts/requirements.txt
+          terraform fmt -check -recursive
+          python3 -m yamllint -s rules example-rules tests/fixtures
+          terraform init -backend=false -input=false -no-color -lockfile=readonly
+          terraform validate -no-color
+          terraform test -no-color
+          terraform -chdir=bootstrap init -backend=false -input=false -no-color -lockfile=readonly
+          terraform -chdir=bootstrap validate -no-color
+          terraform -chdir=bootstrap test -no-color
+          python3 -m unittest scripts/test_okta_rules.py
+  plan:
+    name: Plan preview
+    needs: checks
+    if: github.event_name == 'pull_request' && vars.TF_STATE_BUCKET != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # reference v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/okta-terraform
+        with:
+          okta-oauth: ${{ secrets.OKTA_OAUTH }}
+          session-name: okta-group-rules-pr
+      - name: Plan and summarize (read-only, does not lock state)
+        env:
+          COMMIT_TITLE: ${{ github.event.pull_request.title }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          terraform plan -input=false -no-color -lock=false -out=tfplan
+          terraform show -json tfplan > plan.json
+          python3 scripts/okta_rules.py summary plan.json
