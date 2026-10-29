@@ -42,6 +42,8 @@ What you get:
 - A drift check that spots changes made in the Okta GUI and can import them into Git
 - Optional Slack alerts
 
+<img src=".github/slack-alerts.png" alt="Slack alerts for a deploy, a drift check and a drift import" width="700">
+
 Use this repo as a template, follow [Setup](#setup), then import your existing rules.
 
 ## Where things are
@@ -244,7 +246,7 @@ scripts/check.sh            # all checks + plan preview
 scripts/check.sh --no-plan  # checks only
 ```
 
-The first run sets up Python tools in `.venv`. You'll see `pass`, `FAIL` (with the reason) or `skipped` for each check.
+The first run sets up Python tools in `.venv`, using the [MacAdmins managed Python](https://github.com/macadmins/python) (`managed_python3`) when it's installed, otherwise `python3`. To pick another one, run `PYTHON=/path/to/python3 scripts/check.sh`. You'll see `pass`, `FAIL` (with the reason) or `skipped` for each check.
 
 The plan preview compares your rules with the last deploy, from the `tfstate-backup` branch. It runs the same rule checks as the real plan (unknown groups, duplicate names, and so on) and shows the same change table and gate as the PR. It can't see changes made in the Okta GUI, so the PR's Plan preview is the final word. Until the first deploy there is no `tfstate-backup` branch, so the preview is skipped.
 
