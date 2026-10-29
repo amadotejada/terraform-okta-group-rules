@@ -233,7 +233,9 @@ def apply_export(files, okta_rules, group_names, ids_by_key):
                 rows.append((entry.get("name", key), "deleted in GUI", f"removed {key} from {fname}"))
                 continue
             current = okta_rule_to_yaml(okta_by_id[rule_id], group_names)
-            notes = rule_diff(entry, current)
+            # Groups listed by id compare as names, so they aren't reported as drift.
+            mine = dict(entry, groups=[group_names.get(g, g) for g in entry.get("groups") or []])
+            notes = rule_diff(mine, current)
             if not notes:
                 continue
             for field in ("name", "expression", "status", "users_excluded"):
@@ -241,9 +243,9 @@ def apply_export(files, okta_rules, group_names, ids_by_key):
                     entry[field] = current[field]
                 elif field not in current and field in entry:
                     del entry[field]
-            if set(entry.get("groups") or []) != set(current["groups"]):
-                kept = [g for g in entry.get("groups") or [] if g in current["groups"]]
-                update_list(entry, "groups", kept + [g for g in current["groups"] if g not in kept])
+            if set(mine["groups"]) != set(current["groups"]):
+                kept = [g for g in entry.get("groups") or [] if group_names.get(g, g) in current["groups"]]
+                update_list(entry, "groups", kept + [g for g in current["groups"] if g not in mine["groups"]])
             touched.add(fname)
             rows.append((current["name"], "changed in GUI", "; ".join(notes)))
 

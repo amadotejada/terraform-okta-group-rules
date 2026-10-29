@@ -35,7 +35,7 @@ Okta group rules live in this repo as YAML. You change a file, open a pull reque
 
 What you get:
 
-- Rules as plain YAML, one file per team, with group **names** instead of IDs
+- Rules as plain YAML, one file per team, with readable group **names** (IDs work too)
 - PR checks that catch typos, unknown groups, duplicate names and bad YAML before merge
 - A plan preview on every PR with a table of exactly what will change in Okta
 - Deploys that apply small changes right away and hold deletes or big changes for an approver
@@ -92,7 +92,7 @@ eng-platform-tr:
 - **Key** (`eng-platform-tr`): the rule's permanent ID in Terraform. Lowercase letters, numbers and dashes. **Never rename it.** It's fine if it still mentions an old team name.
 - **name**: what Okta shows. Up to 50 characters, unique across all files. Safe to change.
 - **expression**: the Okta expression, same as in the GUI.
-- **groups**: Okta group **names**, not IDs. Each one must exist in Okta.
+- **groups**: Okta group **names** or group IDs (`00g...`), mixed freely. Names are easier to review, and IDs keep working if a group is renamed. Each one must exist in Okta, and a name that matches more than one group fails the PR checks.
 - **status**: `ACTIVE` or `INACTIVE`. **A rule is only on with `status: ACTIVE`.** Leave it out and the rule is created, or switched, to INACTIVE.
 - Optional:
   - `users_excluded: [00u...]` to skip specific users.
@@ -200,7 +200,7 @@ Current members keep their groups. New joiners don't get added while it's paused
 1. PR 1: delete the rule block. This goes through prod-gated, and members keep their groups.
 2. After profiles catch up, PR 2: add the rule back with the same key and the new team, without the `id:` line.
 
-**If a group was renamed in Okta:** update the group name in the YAML. The group ID is the same, so Okta sees no change. Until you do, plans fail with "group doesn't exist".
+**If a group was renamed in Okta:** update the group name in the YAML. The group ID is the same, so Okta sees no change. Until you do, plans fail with "group doesn't exist". Groups listed by ID aren't affected.
 
 ## Drift (changes made in the Okta GUI)
 

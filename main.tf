@@ -27,7 +27,8 @@ locals {
   keys_by_name = { for key, rule in local.rules : try(coalesce(rule.name, ""), "") => key... }
   keys_by_id   = { for key, rule in local.rules : rule.id => key... if try(rule.id, null) != null }
   rule_groups  = { for key, rule in local.rules : key => try(tolist(rule.groups), []) }
-  group_ids    = { for g in data.okta_groups.all.groups : g.name => g.id... }
+  # Groups can be listed by name or by Okta group id.
+  group_ids = merge({ for g in data.okta_groups.all.groups : g.id => [g.id] }, { for g in data.okta_groups.all.groups : g.name => g.id... })
 
   allowed_attributes = ["name", "expression", "groups", "status", "users_excluded", "id"]
 }
