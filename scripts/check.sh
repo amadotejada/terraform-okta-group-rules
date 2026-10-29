@@ -47,8 +47,12 @@ skip() {
 
 echo "${B}Setup${N}"
 command -v terraform >/dev/null || { echo "  Terraform is missing. Install it: brew install hashicorp/tap/terraform"; exit 1; }
+# Prefers the MacAdmins managed Python (github.com/macadmins/python) when installed. Override with PYTHON=/path/to/python3.
+PYTHON=${PYTHON:-$(command -v managed_python3 || command -v python3)}
+[ -n "$PYTHON" ] || { echo "  Python 3 is missing. Install it: brew install python, or github.com/macadmins/python"; exit 1; }
 if [ ! -x .venv/bin/python ] || [ scripts/requirements.txt -nt .venv/.installed ]; then
-  step "Python tools (.venv)" "" sh -c 'python3 -m venv .venv && .venv/bin/pip install -q -r scripts/requirements.txt && touch .venv/.installed'
+  setup_venv() { "$PYTHON" -m venv .venv && .venv/bin/pip install -q -r scripts/requirements.txt && touch .venv/.installed; }
+  step "Python tools (.venv)" "" setup_venv
   [ "$failed" = 0 ] || exit 1
 else
   printf '  %-30s%s\n' "Python tools (.venv)" "${G}ready${N}"
@@ -84,7 +88,7 @@ if [ "$PLAN" = 0 ]; then
 elif [ "$failed" != 0 ]; then
   skip "Plan preview" "fix the failures above first"
 # Last deploy's state from the tfstate-backup branch. If the fetch fails, the last fetched copy is used.
-elif ! { git fetch -q origin tfstate-backup 2>/dev/null; git rev-parse -q --verify origin/tfstate-backup >/dev/null; }; then
+elif ! { git fetch -q origin tfstate-backup 2>/dev/null; git rev-parse -q --verify origin/tfstate-backup >/dev/null 2>&1; }; then
   skip "Plan preview" "no tfstate-backup branch yet, the first deploy creates it"
 else
   step "Rule checks + change preview" "" offline_preview
