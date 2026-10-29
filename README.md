@@ -7,6 +7,28 @@
 >
 > Need help setting this up or want something custom for your org? [Reach out](https://github.com/amadotejada) for paid services.
 
+**Contents**
+
+- [Where things are](#where-things-are)
+- [A rule](#a-rule)
+- [Making a change](#making-a-change)
+- [Examples](#examples)
+  - [Create a group rule](#create-a-group-rule)
+  - [Update a group rule](#update-a-group-rule)
+  - [Delete a group rule](#delete-a-group-rule)
+  - [Move a rule](#move-a-rule)
+  - [Good to know](#good-to-know)
+- [Reorgs and team renames](#reorgs-and-team-renames)
+- [Drift (changes made in the Okta GUI)](#drift-changes-made-in-the-okta-gui)
+- [Protections](#protections)
+- [Running checks locally (optional)](#running-checks-locally-optional)
+- [Setup](#setup)
+  - [1. Okta service app](#1-okta-service-app)
+  - [2. AWS](#2-aws)
+  - [3. GitHub](#3-github)
+  - [4. Create the state bucket](#4-create-the-state-bucket)
+  - [5. Import your existing rules](#5-import-your-existing-rules)
+
 Okta group rules live in this repo as YAML. You change a file, open a pull request, a teammate reviews it, and GitHub Actions applies it to Okta. Nobody needs to run Terraform themselves.
 
 What you get:
