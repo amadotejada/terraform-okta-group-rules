@@ -29,7 +29,9 @@
   - [4. Create the state bucket](#4-create-the-state-bucket)
   - [5. Import your existing rules](#5-import-your-existing-rules)
 
-Okta group rules live in this repo as YAML. You change a file, open a pull request, a teammate reviews it, and GitHub Actions applies it to Okta. Nobody needs to run Terraform themselves.
+A friendly way to start managing Okta group rules with Terraform. **Beginners are welcome.** You don't need to know Terraform, and nobody on your team ever has to run it by hand. If you can edit a YAML file and open a pull request, you can manage your group rules here.
+
+Okta group rules live in this repo as YAML. You change a file, open a pull request, a teammate reviews it, and GitHub Actions applies it to Okta. Every change is checked before it merges and shown to you in plain language, so it's hard to break things by accident.
 
 What you get:
 
