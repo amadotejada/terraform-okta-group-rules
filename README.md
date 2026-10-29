@@ -1,0 +1,1 @@
+# terraform-okta-group-rules
