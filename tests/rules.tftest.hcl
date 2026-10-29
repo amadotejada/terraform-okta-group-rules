@@ -15,7 +15,7 @@ mock_provider "okta" {
         { id = "00g9", name = "all-employees", type = "OKTA_GROUP", description = "", custom_profile_attributes = "" },
         { id = "00g10", name = "slack-users", type = "OKTA_GROUP", description = "", custom_profile_attributes = "" },
         { id = "00g11", name = "contractors", type = "OKTA_GROUP", description = "", custom_profile_attributes = "" },
-        { id = "00g12", name = "looker-users", type = "OKTA_GROUP", description = "", custom_profile_attributes = "" },
+        { id = "00g12", name = "vpn-users", type = "OKTA_GROUP", description = "", custom_profile_attributes = "" },
       ]
     }
   }

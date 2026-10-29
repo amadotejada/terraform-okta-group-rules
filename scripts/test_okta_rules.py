@@ -35,7 +35,7 @@ def rule(name, groups=("00g1",), expr='user.team == "A"', rule_id="0pr1"):
 
 def plan(*changes, drift=()):
     return {"resource_changes": list(changes), "resource_drift": list(drift), "prior_state": {"values": {"root_module": {"resources": [
-        {"address": "data.okta_groups.all", "values": {"groups": [{"id": "00g1", "name": "github-users"}, {"id": "00g2", "name": "looker"}]}}]}}}}
+        {"address": "data.okta_groups.all", "values": {"groups": [{"id": "00g1", "name": "github-users"}, {"id": "00g2", "name": "vpn"}]}}]}}}}
 
 
 class ParseEnvTest(unittest.TestCase):
@@ -134,7 +134,7 @@ class SummaryTest(unittest.TestCase):
     def test_replace_counted_once_and_names_groups(self):
         _, rows, counts, env, _ = okta_rules.summarize(plan(change(["delete", "create"], before=rule("r"), after=rule("r", groups=("00g1", "00g2")))))
         self.assertEqual((counts["changes"], counts["deletes"], env), (1, 1, "prod-gated"))
-        self.assertIn("+looker", rows[0][2])
+        self.assertIn("+vpn", rows[0][2])
 
     def test_update_shows_expression(self):
         _, rows, _, env, _ = okta_rules.summarize(plan(change(["update"], before=rule("r"), after=rule("r", expr='user.team == "B"'))))
@@ -180,13 +180,13 @@ def okta_rule(rule_id, name, groups, expr='user.team == "A"', status="ACTIVE"):
 
 
 class ExportTest(unittest.TestCase):
-    names = {"00g1": "github-users", "00g2": "looker"}
+    names = {"00g1": "github-users", "00g2": "vpn"}
 
     def files(self):
         return {"eng.yaml": {
             "eng-a": {"name": "Eng A", "expression": 'user.team == "A"', "groups": ["github-users"], "status": "ACTIVE"},
-            "eng-b": {"name": "Eng B", "expression": 'user.team == "B"', "groups": ["looker"], "status": "ACTIVE"},
-            "eng-new": {"name": "Eng New", "expression": "true", "groups": ["looker"]},
+            "eng-b": {"name": "Eng B", "expression": 'user.team == "B"', "groups": ["vpn"], "status": "ACTIVE"},
+            "eng-new": {"name": "Eng New", "expression": "true", "groups": ["vpn"]},
         }}
 
     def test_unchanged_produces_nothing(self):
@@ -203,7 +203,7 @@ class ExportTest(unittest.TestCase):
         rows, touched = okta_rules.apply_export(files, okta, self.names, {"eng-a": "0pr1", "eng-b": "0pr2"})
         actions = {r[0]: r[1] for r in rows}
         self.assertEqual(actions, {"Eng A": "changed in GUI", "Eng B": "deleted in GUI", "Eng New": "not applied", "Sales X": "created in GUI"})
-        self.assertEqual(files["eng.yaml"]["eng-a"]["groups"], ["github-users", "looker"])
+        self.assertEqual(files["eng.yaml"]["eng-a"]["groups"], ["github-users", "vpn"])
         self.assertEqual(files["eng.yaml"]["eng-a"]["expression"], 'user.team == "A2"')
         self.assertNotIn("eng-b", files["eng.yaml"])
         self.assertEqual(files["sales/sales-ae.yaml"]["sales-x"]["id"], "0pr9")
@@ -225,30 +225,30 @@ class ExportTest(unittest.TestCase):
 
     def test_groups_update_keeps_next_rule_comment(self):
         yaml = okta_rules.yaml_handler()
-        doc = yaml.load("eng-a:\n  name: Eng A\n  expression: 'true'\n  groups:\n    - github-users\n\n# owned by data team\neng-b:\n  name: Eng B\n  expression: 'true'\n  groups:\n    - looker\n")
+        doc = yaml.load("eng-a:\n  name: Eng A\n  expression: 'true'\n  groups:\n    - github-users\n\n# owned by data team\neng-b:\n  name: Eng B\n  expression: 'true'\n  groups:\n    - vpn\n")
         okta_rules.apply_export({"eng.yaml": doc}, [okta_rule("0pr1", "Eng A", ["00g2"], "true"), okta_rule("0pr2", "Eng B", ["00g2"], "true")],
                                 self.names, {"eng-a": "0pr1", "eng-b": "0pr2"})
         out = io.StringIO()
         yaml.dump(doc, out)
-        self.assertIn("    - looker\n\n# owned by data team\n", out.getvalue())
+        self.assertIn("    - vpn\n\n# owned by data team\n", out.getvalue())
 
     def test_unplaceable_new_rule_goes_to_imported_with_unique_key(self):
-        files = {"a.yaml": {"eng-a": {"name": "Other", "expression": "true", "groups": ["looker"], "id": "0pr1"}}}
+        files = {"a.yaml": {"eng-a": {"name": "Other", "expression": "true", "groups": ["vpn"], "id": "0pr1"}}}
         rows, _ = okta_rules.apply_export(files, [okta_rule("0pr1", "Other", ["00g2"], "true"), okta_rule("0pr2", "Eng A", ["00g1"])], self.names, {})
         self.assertIn("eng-a-2", files[okta_rules.IMPORTED_FILE])
 
     def test_inbox_rule_moves_once_placeable(self):
         files = {okta_rules.IMPORTED_FILE: {
             "eng-a": {"name": "Eng A", "expression": 'user.team == "A"', "groups": ["github-users"], "status": "ACTIVE", "id": "0pr1"},
-            "looker": {"name": "Looker", "expression": 'isMemberOfAnyGroup("00g9")', "groups": ["looker"], "status": "ACTIVE", "id": "0pr2"},
+            "vpn": {"name": "VPN", "expression": 'isMemberOfAnyGroup("00g9")', "groups": ["vpn"], "status": "ACTIVE", "id": "0pr2"},
         }}
         okta = [okta_rule("0pr1", "Eng A", ["00g1"], '(user.department=="Engineering") and (user.team=="A")'),
-                okta_rule("0pr2", "Looker", ["00g2"], 'isMemberOfAnyGroup("00g9")')]
+                okta_rule("0pr2", "VPN", ["00g2"], 'isMemberOfAnyGroup("00g9")')]
         rows, touched = okta_rules.apply_export(files, okta, self.names, {})
         self.assertEqual(files[okta_rules.IMPORTED_FILE], {})
         self.assertEqual(files["engineering/a.yaml"]["eng-a"]["expression"], '(user.department=="Engineering") and (user.team=="A")')
-        self.assertIn("looker", files["other/looker.yaml"])
-        self.assertEqual(touched, {okta_rules.IMPORTED_FILE, "engineering/a.yaml", "other/looker.yaml"})
+        self.assertIn("vpn", files["other/vpn.yaml"])
+        self.assertEqual(touched, {okta_rules.IMPORTED_FILE, "engineering/a.yaml", "other/vpn.yaml"})
         self.assertEqual(sorted(r[1] for r in rows), ["changed in GUI", "moved", "moved"])
 
     def test_round_trip_keeps_comments(self):
@@ -258,7 +258,7 @@ class ExportTest(unittest.TestCase):
         out = io.StringIO()
         yaml.dump(doc, out)
         self.assertIn("# keep me", out.getvalue())
-        self.assertIn("    - looker", out.getvalue())
+        self.assertIn("    - vpn", out.getvalue())
 
 
 class RuleFileTest(unittest.TestCase):
@@ -266,17 +266,17 @@ class RuleFileTest(unittest.TestCase):
 
     def test_placement(self):
         cases = {
-            f'{self.org} and (user.department=="Business Operations" ) and (user.team=="Biz Ops - MDEV")': "business-operations/biz-ops-mdev.yaml",
+            f'{self.org} and (user.department=="Finance" ) and (user.team=="Finance - Payroll")': "finance/finance-payroll.yaml",
             f'{self.org} and (user.department=="Engineering")': "engineering/_department.yaml",
-            f'{self.org} and (user.department=="Client Strategy" or user.department=="Revenue" or user.department=="Sales") and (user.team=="CS - Implementation")': "multi-department/cs-implementation.yaml",
-            f'{self.org} and (user.department=="Client Strategy" or user.department=="Revenue")': "multi-department/_department.yaml",
+            f'{self.org} and (user.department=="Customer Success" or user.department=="Support" or user.department=="Sales") and (user.team=="CS - Onboarding")': "multi-department/cs-onboarding.yaml",
+            f'{self.org} and (user.department=="Customer Success" or user.department=="Support")': "multi-department/_department.yaml",
             self.org: "org-wide.yaml",
-            'isMemberOfAnyGroup("00g1","00g2")': "other/looker-users.yaml",
+            'isMemberOfAnyGroup("00g1","00g2")': "other/vpn-users.yaml",
             '(user.department=="Engineering") and (user.team=="A" or user.team=="B")': okta_rules.IMPORTED_FILE,
             'user.team == "A"': okta_rules.IMPORTED_FILE,
         }
         for expression, expected in cases.items():
-            self.assertEqual(okta_rules.rule_file(expression, "looker-users"), expected, expression)
+            self.assertEqual(okta_rules.rule_file(expression, "vpn-users"), expected, expression)
 
 
 class ExamplesTest(unittest.TestCase):
@@ -312,13 +312,13 @@ class OfflinePlanTest(unittest.TestCase):
     def test_matches_what_terraform_would_plan(self):
         state = {"resources": [
             {"mode": "data", "type": "okta_groups", "instances": [{"attributes": {"groups": [
-                {"id": "00g1", "name": "github-users"}, {"id": "00g2", "name": "looker"}]}}]},
+                {"id": "00g1", "name": "github-users"}, {"id": "00g2", "name": "vpn"}]}}]},
             {"mode": "managed", "type": "okta_group_rule", "instances": [
                 {"index_key": k, "attributes": dict(rule(k, groups=g), users_excluded=None)}
                 for k, g in (("same", ("00g1",)), ("renamed", ("00g1",)), ("regrouped", ("00g1",)), ("gone", ("00g1",)))]}]}
         yaml_rule = {"expression": 'user.team == "A"', "status": "ACTIVE", "groups": ["github-users"]}
         files = {"a.yaml": {"same": dict(yaml_rule, name="same"), "renamed": dict(yaml_rule, name="new name"),
-                            "regrouped": dict(yaml_rule, name="regrouped", groups=["github-users", "looker"])},
+                            "regrouped": dict(yaml_rule, name="regrouped", groups=["github-users", "vpn"])},
                  "b.yaml": {"new": dict(yaml_rule, name="new"), "adopted": dict(yaml_rule, name="adopted", id="0pr9")}}
         plan = okta_rules.offline_plan(state, files)
         actions = {rc["index"]: rc["change"]["actions"] for rc in plan["resource_changes"]}
@@ -326,7 +326,7 @@ class OfflinePlanTest(unittest.TestCase):
                                    "gone": ["delete"], "new": ["create"], "adopted": ["no-op"]})
         title, rows, counts, env, _ = okta_rules.summarize(plan)
         self.assertEqual((counts["changes"], counts["imports"], counts["unchanged"], env), (4, 1, 1, "prod-gated"))
-        self.assertIn("+looker", dict((r, d) for r, _, d in rows)["regrouped"])
+        self.assertIn("+vpn", dict((r, d) for r, _, d in rows)["regrouped"])
 
     def test_missing_status_means_inactive(self):
         state = {"resources": [{"mode": "managed", "type": "okta_group_rule",
