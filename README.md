@@ -5,7 +5,7 @@
 >
 > It helps others find it and encourages me to keep improving this repo and to open source more Okta and Terraform projects.
 >
-> Need help setting this up or want something custom for your org? [Reach out](https://github.com/amadotejada) for paid services.
+> Feel free to [reach out](https://github.com/amadotejada)!
 
 **Contents**
 
