@@ -33,7 +33,7 @@ run "valid_rules_across_files" {
   }
   assert {
     condition     = okta_group_rule.this["eng-platform-tr"].group_assignments == toset(["00g1", "00g2"])
-    error_message = "Group names should resolve to Okta group IDs."
+    error_message = "Group names and ids should resolve to Okta group IDs."
   }
   assert {
     condition     = okta_group_rule.this["sales-ae-tr"].status == "INACTIVE" && okta_group_rule.this["eng-platform-tr"].status == "ACTIVE"

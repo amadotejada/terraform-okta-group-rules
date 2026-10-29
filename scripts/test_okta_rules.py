@@ -218,6 +218,13 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(files["eng.yaml"]["eng-a-2"]["id"], "0pr7")
         self.assertNotIn(okta_rules.IMPORTED_FILE, files)
 
+    def test_group_ids_are_not_drift_and_kept_as_ids(self):
+        files = {"eng.yaml": {"eng-a": {"name": "Eng A", "expression": 'user.team == "A"', "groups": ["00g1"], "status": "ACTIVE"}}}
+        rows, touched = okta_rules.apply_export(files, [okta_rule("0pr1", "Eng A", ["00g1"])], self.names, {"eng-a": "0pr1"})
+        self.assertEqual((rows, touched), ([], set()))
+        okta_rules.apply_export(files, [okta_rule("0pr1", "Eng A", ["00g1", "00g2"])], self.names, {"eng-a": "0pr1"})
+        self.assertEqual(files["eng.yaml"]["eng-a"]["groups"], ["00g1", "vpn"])
+
     def test_pending_delete_not_readded(self):
         files = {"eng.yaml": {}}
         rows, touched = okta_rules.apply_export(files, [okta_rule("0pr1", "Eng A", ["00g1"])], self.names, {"eng-a": "0pr1"})

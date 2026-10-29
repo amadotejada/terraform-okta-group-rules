@@ -3,5 +3,5 @@ eng-platform-tr:
   expression: user.department == "Engineering" && user.team == "Platform"
   groups:
     - github-users
-    - aws-readonly
+    - 00g2  # an Okta group id works too
   status: ACTIVE
