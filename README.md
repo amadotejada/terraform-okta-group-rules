@@ -66,9 +66,9 @@ rules/
     _department.yaml
     eng-platform.yaml
   multi-department/
-    cs-implementation.yaml
+    cs-onboarding.yaml
   other/
-    looker-users-rule.yaml
+    vpn-users.yaml
   org-wide.yaml
   imported.yaml
 ```
@@ -116,15 +116,15 @@ Two people can work at the same time. Conflicts only happen if you both edit the
 
 ### Create a group rule
 
-Add a block to the team's file, e.g. `rules/engineering/eng-app-platform.yaml`. For a team that has no file yet, create `rules/<department>/<team>.yaml`.
+Add a block to the team's file, e.g. `rules/engineering/eng-mobile.yaml`. For a team that has no file yet, create `rules/<department>/<team>.yaml`.
 
 ```yaml
-emp-eng-app-platform-tr:
-  name: Emp Eng - App Platform TR
-  expression: (user.department=="Engineering") and (user.team=="Eng - App Platform")
+emp-eng-mobile-tr:
+  name: Emp Eng - Mobile TR
+  expression: (user.department=="Engineering") and (user.team=="Eng - Mobile")
   groups:
-    - looker-engineering
-    - looker-users
+    - aws-developers
+    - pagerduty-users
   status: ACTIVE
 ```
 
@@ -148,12 +148,12 @@ Edit the fields in place. Never change the key.
 For example, adding a group:
 
 ```yaml
-emp-eng-app-platform-tr:
-  name: Emp Eng - App Platform TR
-  expression: (user.department=="Engineering") and (user.team=="Eng - App Platform")
+emp-eng-mobile-tr:
+  name: Emp Eng - Mobile TR
+  expression: (user.department=="Engineering") and (user.team=="Eng - Mobile")
   groups:
-    - looker-engineering
-    - looker-users
+    - aws-developers
+    - pagerduty-users
     - github-users        # new
   status: ACTIVE
 ```
@@ -183,7 +183,7 @@ Cut the block from one file and paste it into another, with the same key. Plan p
 Your HR system updates Okta profiles on its own schedule, so for a while some people have the old team name and some have the new one. Pick one of these:
 
 **Option 1, match both names (nobody waits):**
-1. PR 1: widen the expression, e.g. `user.team == "Biz Ops - MDEV" or user.team == "Biz Ops - Dev"`. Update `name:` and any renamed groups.
+1. PR 1: widen the expression, e.g. `user.team == "Data - Analytics" or user.team == "Data - Insights"`. Update `name:` and any renamed groups.
 2. Once profiles have caught up, PR 2: remove the old team name.
 
 New joiners keep getting access the whole time.
